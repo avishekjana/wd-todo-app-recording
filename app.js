@@ -76,12 +76,18 @@ passport.deserializeUser((id, done) => {
 
 const { Todo, User } = require("./models");
 
-app.get("/", async (request, response) => {
-  response.render("index", {
-    title: "Todo application",
-    csrfToken: request.csrfToken(),
-  });
-});
+app.get(
+  "/",
+  connectEnsureLogin.ensureLoggedOut({
+    redirectTo: "/todos",
+  }),
+  async (request, response) => {
+    response.render("index", {
+      title: "Todo application",
+      csrfToken: request.csrfToken(),
+    });
+  }
+);
 
 app.get(
   "/todos",
@@ -191,6 +197,9 @@ app.put(
   async (request, response) => {
     console.log("We have to update a todo with ID:", request.params.id);
     const todo = await Todo.findByPk(request.params.id);
+    if (todo.userId !== request.user.id) {
+      return response.status(401).json({ error: "No such item" });
+    }
     try {
       const updatedTodo = await todo.setCompletionStatus(
         request.body.completed
@@ -209,8 +218,8 @@ app.delete(
   connectEnsureLogin.ensureLoggedIn(),
   async (request, response) => {
     try {
-      await Todo.remove(request.params.id, request.user.id);
-      return response.json({ success: true });
+      const deletedRows = await Todo.remove(request.params.id, request.user.id);
+      return response.json({ success: deletedRows > 0 });
     } catch (error) {
       return response.status(422).json(error);
     }
