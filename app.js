@@ -7,6 +7,8 @@ const path = require("path");
 const passport = require("passport");
 const connectEnsureLogin = require("connect-ensure-login");
 const session = require("express-session");
+const flash = require("connect-flash");
+
 const LocalStrategy = require("passport-local");
 const bcrypt = require("bcrypt");
 
@@ -16,14 +18,14 @@ app.use(bodyParser.json());
 
 // Set EJS as view engine
 app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser("shh! some secret string"));
 // app.use(csrf({ cookie: true }))
-app.use(csrf("this_should_be_32_character_long", ["POST", "PUT", "DELETE"]));
 app.use(express.static(path.join(__dirname, "public")));
-
+app.use(flash());
 app.use(
   session({
     secret: "my-super-secret-key-21728172615261562",
@@ -32,6 +34,12 @@ app.use(
     },
   })
 );
+app.use(csrf("this_should_be_32_character_long", ["POST", "PUT", "DELETE"]));
+
+app.use(function (request, response, next) {
+  response.locals.messages = request.flash();
+  next();
+});
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -45,11 +53,14 @@ passport.use(
     (username, password, done) => {
       User.findOne({ where: { email: username } })
         .then(async (user) => {
+          if (!user) {
+            return done(null, false, { message: "Invalid login credentials" });
+          }
           const result = await bcrypt.compare(password, user.password);
           if (result) {
             return done(null, user);
           } else {
-            return done("Invalid Password");
+            return done(null, false, { message: "Invalid login credentials" });
           }
         })
         .catch((error) => {
@@ -60,7 +71,7 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
-  console.log("Serializing user in session", user.id);
+  // console.log("Serializing user in session", user.id);
   done(null, user.id);
 });
 
@@ -127,8 +138,12 @@ app.get("/signup", (request, response) => {
 
 app.post("/users", async (request, response) => {
   // Hash password using bcrypt
-  const hashedPwd = await bcrypt.hash(request.body.password, saltRounds);
-  console.log(hashedPwd);
+  const password = request.body.password.trim();
+  if (password.length < 8) {
+    request.flash("error", "Password should be minimum 8 characters");
+  }
+  const hashedPwd = await bcrypt.hash(password, saltRounds);
+  // console.log(hashedPwd);
   // Have to create the user here
   try {
     const user = await User.create({
@@ -145,6 +160,11 @@ app.post("/users", async (request, response) => {
     });
   } catch (error) {
     console.log(error);
+    error.errors &&
+      error.errors.length &&
+      error.errors.map((anError) => request.flash("error", anError.message));
+
+    response.redirect("/signup");
   }
 });
 
@@ -154,9 +174,11 @@ app.get("/login", (request, response) => {
 
 app.post(
   "/session",
-  passport.authenticate("local", { failureRedirect: "/login" }),
+  passport.authenticate("local", {
+    failureRedirect: "/login",
+    failureFlash: true,
+  }),
   (request, response) => {
-    console.log(request.user);
     response.redirect("/todos");
   }
 );
@@ -175,7 +197,6 @@ app.post(
   "/todos",
   connectEnsureLogin.ensureLoggedIn(),
   async (request, response) => {
-    console.log("Creating a todo", request.body);
     try {
       await Todo.addTodo({
         title: request.body.title,
@@ -184,8 +205,9 @@ app.post(
       });
       return response.redirect("/todos");
     } catch (error) {
-      console.log(error);
-      return response.status(422).json(error);
+      console.log(error.message);
+      request.flash("error", error.message);
+      return response.redirect("/todos");
     }
   }
 );
@@ -195,7 +217,7 @@ app.put(
   "/todos/:id",
   connectEnsureLogin.ensureLoggedIn(),
   async (request, response) => {
-    console.log("We have to update a todo with ID:", request.params.id);
+    // console.log("We have to update a todo with ID:", request.params.id);
     const todo = await Todo.findByPk(request.params.id);
     if (todo.userId !== request.user.id) {
       return response.status(401).json({ error: "No such item" });

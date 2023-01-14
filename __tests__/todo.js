@@ -47,6 +47,8 @@ describe("List the todo items", function () {
     });
     expect(res.statusCode).toBe(302);
 
+    logout(agent);
+
     res = await agent.get("/signup");
     csrfToken = extractCsrfToken(res);
     res = await agent.post("/users").send({
@@ -57,9 +59,12 @@ describe("List the todo items", function () {
       _csrf: csrfToken,
     });
     expect(res.statusCode).toBe(302);
+    logout(agent);
   });
 
   test("Sign out", async () => {
+    const agent = request.agent(server);
+    await login(agent, "user.a@test.com", "12345678");
     let res = await agent.get("/todos");
     expect(res.statusCode).toBe(200);
     res = await agent.get("/signout");

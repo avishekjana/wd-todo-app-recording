@@ -16,14 +16,11 @@
     function updateTodo(id, completionStatus) {
 
       fetch(`/todos/${id}`, {
-        credentials: 'same-origin',
         method: 'put',
-        headers: {
-          'Content-Type': 'application/json',
-          'CSRF-Token': token
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          completed: completionStatus
+          completed: completionStatus,
+          "_csrf": token
         })
       }).then((res) => {
         window.location.reload(true);
@@ -34,12 +31,11 @@
       console.log(id);
 
       fetch(`/todos/${id}`, {
-        credentials: 'same-origin',
         method: 'delete',
-        headers: {
-          'Content-Type': 'application/json',
-          'CSRF-Token': token
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          "_csrf": token
+        })
       }).then((res) => {
         window.location.reload();
       }).catch(err => console.error(err))
@@ -52,6 +48,11 @@
     <div class="col-start-3 col-span-2">
       <%- include('header.ejs') %>
       <a href="/signout">Signout</a>
+      <% if(messages && messages.error && messages.error.length > 0)  { %>
+        <% for(var i=0; i<messages.error.length; i++) { %>
+                <li> <%= messages.error[i] %></li>
+        <% } %>
+      <% } %>
       <form action="/todos" method="POST">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="flex gap-2 py-4">
