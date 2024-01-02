@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon -e js,ejs",
-    "pretest": "NODE_ENV=test npx sequelize-cli db:drop && NODE_ENV=test npx sequelize-cli db:create",
+    "pretest": "NODE_ENV=test npx sequelize-cli db:drop && NODE_ENV=test npx sequelize-cli db:create && NODE_ENV=test npx sequelize-cli db:migrate",
     "test": "NODE_ENV=test jest --detectOpenHandles",
     "prepare": "husky install"
   },
@@ -20,6 +20,7 @@
   "dependencies": {
     "bcrypt": "^5.1.0",
     "connect-ensure-login": "^0.1.1",
+    "connect-flash": "^0.1.1",
     "cookie-parser": "^1.4.6",
     "csurf": "^1.11.0",
     "ejs": "^3.1.8",
